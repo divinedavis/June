@@ -1,24 +1,3 @@
-//
-//  ContentView.swift
-//  June
-//
-//  Created by Divine Davis on 3/17/26.
-//
-
+// ContentView.swift is intentionally empty — routing is handled by RootView in JuneApp.swift
 import SwiftUI
-
-struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
-    }
-}
-
-#Preview {
-    ContentView()
-}
+struct ContentView: View { var body: some View { EmptyView() } }
