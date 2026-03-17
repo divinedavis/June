@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "June",
+    "slug": "june",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.divinedavis.june",
+      "infoPlist": {
+        "NSCameraUsageDescription": "June needs camera access to post photos.",
+        "NSPhotoLibraryUsageDescription": "June needs photo library access to post images."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      },
+      "package": "com.divinedavis.june"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "June needs photo library access to post images."
+        }
+      ]
+    ],
+    "scheme": "june",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
