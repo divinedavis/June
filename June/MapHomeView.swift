@@ -6,6 +6,8 @@ struct MapHomeView: View {
     @EnvironmentObject private var cloud: CloudKitStore
 
     @StateObject private var weather = WeatherService()
+    @StateObject private var routes = RouteController()
+
     @State private var cameraPosition: MapCameraPosition = .userLocation(
         fallback: .region(MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 40.6883, longitude: -73.9716),
@@ -20,10 +22,15 @@ struct MapHomeView: View {
 
     private static let peekDetent: PresentationDetent = .fraction(0.42)
     private static let placeDetent: PresentationDetent = .fraction(0.45)
+    private static let routeDetent: PresentationDetent = .fraction(0.40)
 
     var body: some View {
         Map(position: $cameraPosition, selection: $selectedItem) {
             UserAnnotation()
+            if let route = routes.active?.route {
+                MapPolyline(route.polyline)
+                    .stroke(JuneTheme.accent, lineWidth: 6)
+            }
         }
         .mapStyle(mapStyle)
         .mapControlVisibility(.hidden)
@@ -38,7 +45,6 @@ struct MapHomeView: View {
             .padding(.top, 8)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            // Reserve space for the peek detent so map controls float above the sheet.
             Color.clear.frame(height: 0)
         }
         .overlay(alignment: .bottomLeading) {
@@ -61,8 +67,6 @@ struct MapHomeView: View {
             location.requestAuthorization()
             location.startUpdates()
             await cloud.loadAll()
-            // Weather may not be wired up to a location yet on first launch.
-            // Try whatever we have, and a Brooklyn fallback if nothing yet.
             if !didFireInitialWeather {
                 didFireInitialWeather = true
                 let seed = location.currentLocation
@@ -74,9 +78,20 @@ struct MapHomeView: View {
             guard let newValue else { return }
             Task { await weather.refresh(for: newValue) }
         }
+        .onChange(of: routes.active) { _, newValue in
+            guard let newValue else { return }
+            // Fit camera to the route once it's ready.
+            withAnimation(.easeInOut(duration: 0.6)) {
+                cameraPosition = .rect(newValue.route.polyline.boundingMapRect)
+            }
+        }
         .sheet(isPresented: $sheetPresented) {
             Group {
-                if let selectedItem {
+                if routes.active != nil {
+                    RouteSheet {
+                        endRoute()
+                    }
+                } else if let selectedItem {
                     PlaceDetailView(item: selectedItem) {
                         self.selectedItem = nil
                     }
@@ -84,15 +99,22 @@ struct MapHomeView: View {
                     HomeSheet(selectedItem: $selectedItem)
                 }
             }
-            .presentationDetents(
-                selectedItem == nil
-                    ? [Self.peekDetent, .medium, .large]
-                    : [Self.placeDetent, .medium, .large]
-            )
+            .environmentObject(routes)
+            .presentationDetents(currentDetents)
             .presentationBackgroundInteraction(.enabled(upThrough: .medium))
             .presentationCornerRadius(28)
             .presentationDragIndicator(.visible)
             .interactiveDismissDisabled()
+        }
+    }
+
+    private var currentDetents: Set<PresentationDetent> {
+        if routes.active != nil {
+            return [Self.routeDetent, .medium, .large]
+        } else if selectedItem != nil {
+            return [Self.placeDetent, .medium, .large]
+        } else {
+            return [Self.peekDetent, .medium, .large]
         }
     }
 
@@ -106,9 +128,13 @@ struct MapHomeView: View {
 
     private func recenterOnUser() {
         withAnimation(.easeInOut(duration: 0.4)) {
-            cameraPosition = .userLocation(
-                fallback: .automatic
-            )
+            cameraPosition = .userLocation(fallback: .automatic)
         }
+    }
+
+    private func endRoute() {
+        routes.cancel()
+        selectedItem = nil
+        recenterOnUser()
     }
 }

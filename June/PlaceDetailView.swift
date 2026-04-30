@@ -8,10 +8,12 @@ struct PlaceDetailView: View {
 
     @EnvironmentObject private var location: LocationManager
     @EnvironmentObject private var cloud: CloudKitStore
+    @EnvironmentObject private var routes: RouteController
 
     @State private var walkMinutes: Int?
     @State private var driveMinutes: Int?
     @State private var loaded = false
+    @State private var requestingDirections = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -82,8 +84,8 @@ struct PlaceDetailView: View {
 
     private var actions: some View {
         HStack(spacing: 10) {
-            actionTile(icon: "arrow.triangle.turn.up.right.circle.fill", label: "Directions") {
-                openInAppleMaps(driving: true)
+            actionTile(icon: "arrow.triangle.turn.up.right.circle.fill", label: "Directions", loading: requestingDirections) {
+                Task { await startDirections() }
             }
             if item.phoneNumber != nil {
                 actionTile(icon: "phone.fill", label: "Call") { call() }
@@ -91,7 +93,7 @@ struct PlaceDetailView: View {
             if item.url != nil {
                 actionTile(icon: "globe", label: "Website") { openWebsite() }
             }
-            actionTile(icon: "square.and.arrow.up", label: "Share") { share() }
+            actionTile(icon: "map", label: "Open in Maps") { openInAppleMaps(driving: true) }
         }
     }
 
@@ -110,11 +112,17 @@ struct PlaceDetailView: View {
         .background(Capsule().fill(Color.white.opacity(0.10)))
     }
 
-    private func actionTile(icon: String, label: String, action: @escaping () -> Void) -> some View {
+    private func actionTile(icon: String, label: String, loading: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .semibold))
+                if loading {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(.white)
+                } else {
+                    Image(systemName: icon)
+                        .font(.system(size: 18, weight: .semibold))
+                }
                 Text(label)
                     .font(.system(size: 12, weight: .semibold))
             }
@@ -126,6 +134,7 @@ struct PlaceDetailView: View {
                     .fill(Color.white.opacity(0.10))
             )
         }
+        .disabled(loading)
     }
 
     // MARK: - Data
@@ -180,6 +189,17 @@ struct PlaceDetailView: View {
     }
 
     // MARK: - Actions
+
+    private func startDirections() async {
+        guard let here = location.currentLocation else {
+            // No location yet — fall back to Apple Maps so the user gets *something*.
+            openInAppleMaps(driving: true)
+            return
+        }
+        requestingDirections = true
+        await routes.start(to: item, from: here.coordinate, transport: .automobile)
+        requestingDirections = false
+    }
 
     private func openInAppleMaps(driving: Bool) {
         item.openInMaps(launchOptions: [
