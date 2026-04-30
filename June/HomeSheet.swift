@@ -1,13 +1,19 @@
+import MapKit
 import PhotosUI
 import SwiftUI
 
 struct HomeSheet: View {
     @EnvironmentObject private var cloud: CloudKitStore
     @EnvironmentObject private var auth: AuthManager
+    @EnvironmentObject private var location: LocationManager
+
+    @Binding var selectedItem: MKMapItem?
+
+    @StateObject private var search = SearchSuggestionsManager()
 
     @State private var searchText: String = ""
     @State private var profilePickerItem: PhotosPickerItem?
-    @State private var showingProfileMenu = false
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,14 +23,20 @@ struct HomeSheet: View {
                 .padding(.bottom, 12)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    sectionHeader("Places")
-                    placesRow
-                    sectionHeader("Recents")
-                    recentsList
+                if showingSuggestions {
+                    suggestionsList
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 24)
+                } else {
+                    VStack(alignment: .leading, spacing: 18) {
+                        sectionHeader("Places")
+                        placesRow
+                        sectionHeader("Recents")
+                        recentsList
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 24)
             }
         }
         .background(JuneTheme.sheetBackground)
@@ -36,6 +48,29 @@ struct HomeSheet: View {
                 }
             }
         }
+        .onChange(of: searchText) { newValue in
+            search.update(query: newValue)
+        }
+        .onChange(of: location.currentLocation) { newLocation in
+            if let coord = newLocation?.coordinate {
+                search.region = MKCoordinateRegion(
+                    center: coord,
+                    span: MKCoordinateSpan(latitudeDelta: 0.15, longitudeDelta: 0.15)
+                )
+            }
+        }
+        .onAppear {
+            if let coord = location.currentLocation?.coordinate {
+                search.region = MKCoordinateRegion(
+                    center: coord,
+                    span: MKCoordinateSpan(latitudeDelta: 0.15, longitudeDelta: 0.15)
+                )
+            }
+        }
+    }
+
+    private var showingSuggestions: Bool {
+        searchText.count >= 3 && !search.suggestions.isEmpty
     }
 
     private var searchRow: some View {
@@ -46,12 +81,23 @@ struct HomeSheet: View {
                 TextField("June", text: $searchText)
                     .textFieldStyle(.plain)
                     .submitLabel(.search)
-                Spacer(minLength: 0)
-                Button {
-                    // mic action — not yet wired
-                } label: {
-                    Image(systemName: "mic.fill")
-                        .foregroundStyle(.secondary)
+                    .focused($searchFocused)
+                    .autocorrectionDisabled(true)
+                    .textInputAutocapitalization(.never)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Button {
+                        // mic action — not yet wired
+                    } label: {
+                        Image(systemName: "mic.fill")
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .padding(.horizontal, 14)
@@ -81,6 +127,40 @@ struct HomeSheet: View {
                 .frame(width: 36, height: 36)
         }
     }
+
+    // MARK: - Suggestions
+
+    private var suggestionsList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(search.suggestions.enumerated()), id: \.offset) { index, completion in
+                Button {
+                    Task { await pick(completion) }
+                } label: {
+                    SuggestionRow(completion: completion)
+                }
+                .buttonStyle(.plain)
+                if index < search.suggestions.count - 1 {
+                    Divider().background(.white.opacity(0.06))
+                }
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(white: 0.13))
+        )
+    }
+
+    private func pick(_ completion: MKLocalSearchCompletion) async {
+        if let item = await search.resolve(completion) {
+            await MainActor.run {
+                searchFocused = false
+                searchText = ""
+                selectedItem = item
+            }
+        }
+    }
+
+    // MARK: - Default content
 
     private func sectionHeader(_ title: String) -> some View {
         HStack(spacing: 6) {
@@ -118,6 +198,40 @@ struct HomeSheet: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color(white: 0.13))
         )
+    }
+}
+
+private struct SuggestionRow: View {
+    let completion: MKLocalSearchCompletion
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(Color(white: 0.22)).frame(width: 36, height: 36)
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(completion.title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                if !completion.subtitle.isEmpty {
+                    Text(completion.subtitle)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
     }
 }
 

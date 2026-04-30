@@ -81,7 +81,7 @@ struct MapHomeView: View {
                         self.selectedItem = nil
                     }
                 } else {
-                    HomeSheet()
+                    HomeSheet(selectedItem: $selectedItem)
                 }
             }
             .presentationDetents(

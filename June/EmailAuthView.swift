@@ -15,8 +15,6 @@ struct EmailAuthView: View {
     @State private var signInPassword = ""
 
     // Sign up
-    @State private var firstName = ""
-    @State private var lastName = ""
     @State private var username = ""
     @State private var signUpEmail = ""
     @State private var signUpPassword = ""
@@ -35,11 +33,20 @@ struct EmailAuthView: View {
             .padding(.bottom, 16)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .top) {
                     if mode == .signIn {
                         signInContent
-                    } else {
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .leading).combined(with: .opacity),
+                                removal: .move(edge: .leading).combined(with: .opacity)
+                            ))
+                    }
+                    if mode == .signUp {
                         signUpContent
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal: .move(edge: .trailing).combined(with: .opacity)
+                            ))
                     }
                 }
                 .padding(.horizontal, 24)
@@ -72,7 +79,7 @@ struct EmailAuthView: View {
             submitButton(title: "Sign In", enabled: signInValid) { showingComingSoon = true }
 
             toggleLink(prompt: "Don't have an account?", action: "Sign up") {
-                withAnimation(.easeInOut(duration: 0.2)) { mode = .signUp }
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { mode = .signUp }
             }
             .padding(.top, 16)
         }
@@ -91,10 +98,6 @@ struct EmailAuthView: View {
             subtitle
                 .padding(.bottom, 32)
 
-            field(label: "First name", text: $firstName, isSecure: false, contentType: .givenName)
-                .padding(.bottom, 20)
-            field(label: "Last name", text: $lastName, isSecure: false, contentType: .familyName)
-                .padding(.bottom, 20)
             field(label: "Username", text: $username, isSecure: false, contentType: .username, autocapitalize: .never, autocorrect: false)
                 .padding(.bottom, 20)
             field(label: "Email", text: $signUpEmail, isSecure: false, contentType: .emailAddress, keyboard: .emailAddress, autocapitalize: .never, autocorrect: false)
@@ -107,16 +110,14 @@ struct EmailAuthView: View {
             submitButton(title: "Create Account", enabled: signUpValid) { showingComingSoon = true }
 
             toggleLink(prompt: "Already have an account?", action: "Sign in") {
-                withAnimation(.easeInOut(duration: 0.2)) { mode = .signIn }
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { mode = .signIn }
             }
             .padding(.top, 16)
         }
     }
 
     private var signUpValid: Bool {
-        !firstName.trimmingCharacters(in: .whitespaces).isEmpty
-            && !lastName.trimmingCharacters(in: .whitespaces).isEmpty
-            && !username.trimmingCharacters(in: .whitespaces).isEmpty
+        !username.trimmingCharacters(in: .whitespaces).isEmpty
             && signUpEmail.contains("@")
             && signUpPassword.count >= 6
             && signUpPassword == confirmPassword
