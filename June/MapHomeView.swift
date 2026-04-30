@@ -16,11 +16,13 @@ struct MapHomeView: View {
     @State private var isPitched = false
     @State private var showsTransit = true
     @State private var didFireInitialWeather = false
+    @State private var selectedItem: MKMapItem?
 
     private static let peekDetent: PresentationDetent = .fraction(0.42)
+    private static let placeDetent: PresentationDetent = .fraction(0.45)
 
     var body: some View {
-        Map(position: $cameraPosition) {
+        Map(position: $cameraPosition, selection: $selectedItem) {
             UserAnnotation()
         }
         .mapStyle(mapStyle)
@@ -73,12 +75,24 @@ struct MapHomeView: View {
             Task { await weather.refresh(for: newValue) }
         }
         .sheet(isPresented: $sheetPresented) {
-            HomeSheet()
-                .presentationDetents([Self.peekDetent, .medium, .large])
-                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
-                .presentationCornerRadius(28)
-                .presentationDragIndicator(.visible)
-                .interactiveDismissDisabled()
+            Group {
+                if let selectedItem {
+                    PlaceDetailView(item: selectedItem) {
+                        self.selectedItem = nil
+                    }
+                } else {
+                    HomeSheet()
+                }
+            }
+            .presentationDetents(
+                selectedItem == nil
+                    ? [Self.peekDetent, .medium, .large]
+                    : [Self.placeDetent, .medium, .large]
+            )
+            .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+            .presentationCornerRadius(28)
+            .presentationDragIndicator(.visible)
+            .interactiveDismissDisabled()
         }
     }
 
