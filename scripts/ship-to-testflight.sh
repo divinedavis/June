@@ -129,16 +129,21 @@ EXPORT_DIR=/tmp/${SCHEME}-ship-export
 rm -rf "$ARCHIVE" "$EXPORT_DIR"
 
 info "archiving ${MARKETING} (${NEXT_BUILD})"
+# Manual signing with the cert + profile we minted via the App Store Connect API.
+# Xcode's auto-provisioning auth path is unreliable for this team / Xcode 26, so we
+# pin the cert/profile we know is good. Override here without touching project.yml.
+SIGN_IDENTITY="${ASC_SIGN_IDENTITY:-Apple Distribution: Divine Davis (CG89RY4W6R)}"
+PROFILE_SPECIFIER="${ASC_PROFILE_SPECIFIER:-June App Store Manual}"
 xcodebuild \
     -project "$PROJECT" \
     -scheme "$SCHEME" \
     -configuration Release \
     -destination "generic/platform=iOS" \
     -archivePath "$ARCHIVE" \
-    -allowProvisioningUpdates \
-    -authenticationKeyPath "$ASC_KEY_PATH" \
-    -authenticationKeyID "$ASC_KEY_ID" \
-    -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+    CODE_SIGN_STYLE=Manual \
+    CODE_SIGN_IDENTITY="$SIGN_IDENTITY" \
+    PROVISIONING_PROFILE_SPECIFIER="$PROFILE_SPECIFIER" \
+    DEVELOPMENT_TEAM="$ASC_TEAM_ID" \
     archive >/tmp/ship-archive.log 2>&1 \
     || { tail -40 /tmp/ship-archive.log; die "archive failed — see /tmp/ship-archive.log"; }
 
@@ -151,9 +156,13 @@ cat > "$EXPORT_OPTS" <<EOF
 <dict>
     <key>method</key><string>app-store-connect</string>
     <key>teamID</key><string>$ASC_TEAM_ID</string>
-    <key>signingStyle</key><string>automatic</string>
+    <key>signingStyle</key><string>manual</string>
     <key>uploadSymbols</key><true/>
     <key>destination</key><string>export</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>$ASC_BUNDLE_ID</key><string>$PROFILE_SPECIFIER</string>
+    </dict>
 </dict>
 </plist>
 EOF
@@ -162,11 +171,7 @@ info "exporting"
 xcodebuild -exportArchive \
     -archivePath "$ARCHIVE" \
     -exportOptionsPlist "$EXPORT_OPTS" \
-    -exportPath "$EXPORT_DIR" \
-    -allowProvisioningUpdates \
-    -authenticationKeyPath "$ASC_KEY_PATH" \
-    -authenticationKeyID "$ASC_KEY_ID" \
-    -authenticationKeyIssuerID "$ASC_ISSUER_ID" >/tmp/ship-export.log 2>&1 \
+    -exportPath "$EXPORT_DIR" >/tmp/ship-export.log 2>&1 \
     || { tail -40 /tmp/ship-export.log; die "export failed — see /tmp/ship-export.log"; }
 
 IPA=$(ls "$EXPORT_DIR"/*.ipa | head -1)
