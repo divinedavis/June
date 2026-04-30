@@ -7,47 +7,33 @@ enum EmailAuthMode: Hashable {
 
 struct EmailAuthView: View {
     @Environment(\.dismiss) private var dismiss
+
     @State private var mode: EmailAuthMode = .signIn
     @State private var showingComingSoon = false
 
-    // Sign in
-    @State private var signInEmail = ""
-    @State private var signInPassword = ""
-
-    // Sign up
+    // Shared between sign-in and sign-up so values persist across the toggle.
+    @State private var email = ""
+    @State private var password = ""
+    // Sign-up only.
     @State private var username = ""
-    @State private var signUpEmail = ""
-    @State private var signUpPassword = ""
-    @State private var confirmPassword = ""
+    @State private var confirm = ""
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Button("Cancel") { dismiss() }
-                    .font(.system(size: 17))
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 16)
+            cancelBar
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
 
             ScrollView {
-                ZStack(alignment: .top) {
-                    if mode == .signIn {
-                        signInContent
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .leading).combined(with: .opacity),
-                                removal: .move(edge: .leading).combined(with: .opacity)
-                            ))
-                    }
-                    if mode == .signUp {
-                        signUpContent
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .trailing).combined(with: .opacity),
-                                removal: .move(edge: .trailing).combined(with: .opacity)
-                            ))
-                    }
+                VStack(alignment: .leading, spacing: 0) {
+                    header
+                    subtitle
+                        .padding(.bottom, 32)
+                    fields
+                    submitButton
+                    toggleLink
+                        .padding(.top, 16)
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 40)
@@ -61,79 +47,45 @@ struct EmailAuthView: View {
         }
     }
 
-    // MARK: - Sign In
+    // MARK: - Bars
 
-    private var signInContent: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            heading(caption: "Welcome back.", title: "Sign in to June.")
-
-            subtitle
-                .padding(.bottom, 32)
-
-            field(label: "Email", text: $signInEmail, isSecure: false, contentType: .emailAddress, keyboard: .emailAddress)
-                .padding(.bottom, 24)
-
-            field(label: "Password", text: $signInPassword, isSecure: true, contentType: .password)
-                .padding(.bottom, 32)
-
-            submitButton(title: "Sign In", enabled: signInValid) { showingComingSoon = true }
-
-            toggleLink(prompt: "Don't have an account?", action: "Sign up") {
-                withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { mode = .signUp }
-            }
-            .padding(.top, 16)
-        }
-    }
-
-    private var signInValid: Bool {
-        signInEmail.contains("@") && signInPassword.count >= 1
-    }
-
-    // MARK: - Sign Up
-
-    private var signUpContent: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            heading(caption: "Let's get started.", title: "Join June.")
-
-            subtitle
-                .padding(.bottom, 32)
-
-            field(label: "Username", text: $username, isSecure: false, contentType: .username, autocapitalize: .never, autocorrect: false)
-                .padding(.bottom, 20)
-            field(label: "Email", text: $signUpEmail, isSecure: false, contentType: .emailAddress, keyboard: .emailAddress, autocapitalize: .never, autocorrect: false)
-                .padding(.bottom, 20)
-            field(label: "Password", text: $signUpPassword, isSecure: true, contentType: .newPassword)
-                .padding(.bottom, 20)
-            field(label: "Confirm password", text: $confirmPassword, isSecure: true, contentType: .newPassword)
-                .padding(.bottom, 32)
-
-            submitButton(title: "Create Account", enabled: signUpValid) { showingComingSoon = true }
-
-            toggleLink(prompt: "Already have an account?", action: "Sign in") {
-                withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { mode = .signIn }
-            }
-            .padding(.top, 16)
-        }
-    }
-
-    private var signUpValid: Bool {
-        !username.trimmingCharacters(in: .whitespaces).isEmpty
-            && signUpEmail.contains("@")
-            && signUpPassword.count >= 6
-            && signUpPassword == confirmPassword
-    }
-
-    // MARK: - Building blocks
-
-    private func heading(caption: String, title: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(caption)
+    private var cancelBar: some View {
+        HStack {
+            Button("Cancel") { dismiss() }
                 .font(.system(size: 17))
                 .foregroundStyle(.secondary)
-            Text(title)
-                .font(.system(size: 38, weight: .heavy))
-                .foregroundStyle(.white)
-                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+        }
+    }
+
+    // MARK: - Header (caption + title) — crossfades on mode change
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Group {
+                if mode == .signIn {
+                    Text("Welcome back.")
+                } else {
+                    Text("Let's get started.")
+                }
+            }
+            .font(.system(size: 17))
+            .foregroundStyle(.secondary)
+            .id(mode.captionId)
+            .transition(.opacity)
+
+            Group {
+                if mode == .signIn {
+                    Text("Sign in to June.")
+                } else {
+                    Text("Join June.")
+                }
+            }
+            .font(.system(size: 38, weight: .heavy))
+            .foregroundStyle(.white)
+            .fixedSize(horizontal: false, vertical: true)
+            .id(mode.titleId)
+            .transition(.opacity)
         }
         .padding(.top, 8)
         .padding(.bottom, 20)
@@ -145,6 +97,138 @@ struct EmailAuthView: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
+
+    // MARK: - Fields — Email + Password are persistent; Username slides in
+    // from above, Confirm password slides in from below.
+
+    private var fields: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            if mode == .signUp {
+                field(
+                    label: "Username",
+                    text: $username,
+                    isSecure: false,
+                    contentType: .username,
+                    autocapitalize: .never,
+                    autocorrect: false
+                )
+                .transition(.asymmetric(
+                    insertion: .move(edge: .top).combined(with: .opacity),
+                    removal: .move(edge: .top).combined(with: .opacity)
+                ))
+            }
+
+            field(
+                label: "Email",
+                text: $email,
+                isSecure: false,
+                contentType: .emailAddress,
+                keyboard: .emailAddress,
+                autocapitalize: .never,
+                autocorrect: false
+            )
+
+            field(
+                label: "Password",
+                text: $password,
+                isSecure: true,
+                contentType: mode == .signIn ? .password : .newPassword
+            )
+
+            if mode == .signUp {
+                field(
+                    label: "Confirm password",
+                    text: $confirm,
+                    isSecure: true,
+                    contentType: .newPassword
+                )
+                .transition(.asymmetric(
+                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                    removal: .move(edge: .bottom).combined(with: .opacity)
+                ))
+            }
+        }
+        .padding(.bottom, 32)
+    }
+
+    // MARK: - Submit + toggle
+
+    private var submitButton: some View {
+        Button {
+            showingComingSoon = true
+        } label: {
+            Group {
+                if mode == .signIn {
+                    Text("Sign In")
+                } else {
+                    Text("Create Account")
+                }
+            }
+            .id(mode.buttonId)
+            .transition(.opacity)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(
+                Capsule().fill(isValid ? JuneTheme.accent : Color.white.opacity(0.18))
+            )
+        }
+        .disabled(!isValid)
+    }
+
+    private var toggleLink: some View {
+        HStack(spacing: 0) {
+            Spacer()
+            Group {
+                if mode == .signIn {
+                    Text("Don't have an account? ")
+                } else {
+                    Text("Already have an account? ")
+                }
+            }
+            .id(mode.toggleLeadId)
+            .transition(.opacity)
+            .font(.system(size: 15))
+            .foregroundStyle(.secondary)
+
+            Button {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.84)) {
+                    mode = (mode == .signIn) ? .signUp : .signIn
+                }
+            } label: {
+                Group {
+                    if mode == .signIn {
+                        Text("Sign up")
+                    } else {
+                        Text("Sign in")
+                    }
+                }
+                .id(mode.toggleActionId)
+                .transition(.opacity)
+                .font(.system(size: 15, weight: .semibold))
+                .underline()
+                .foregroundStyle(.white)
+            }
+            Spacer()
+        }
+    }
+
+    // MARK: - Validation
+
+    private var isValid: Bool {
+        switch mode {
+        case .signIn:
+            return email.contains("@") && !password.isEmpty
+        case .signUp:
+            return !username.trimmingCharacters(in: .whitespaces).isEmpty
+                && email.contains("@")
+                && password.count >= 6
+                && password == confirm
+        }
+    }
+
+    // MARK: - Field builder
 
     private func field(
         label: String,
@@ -178,34 +262,12 @@ struct EmailAuthView: View {
                 .frame(height: 1)
         }
     }
+}
 
-    private func submitButton(title: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background(
-                    Capsule().fill(enabled ? JuneTheme.accent : Color.white.opacity(0.18))
-                )
-        }
-        .disabled(!enabled)
-    }
-
-    private func toggleLink(prompt: String, action: String, perform: @escaping () -> Void) -> some View {
-        HStack(spacing: 0) {
-            Spacer()
-            Text("\(prompt) ")
-                .font(.system(size: 15))
-                .foregroundStyle(.secondary)
-            Button(action: perform) {
-                Text(action)
-                    .font(.system(size: 15, weight: .semibold))
-                    .underline()
-                    .foregroundStyle(.white)
-            }
-            Spacer()
-        }
-    }
+private extension EmailAuthMode {
+    var captionId: String { "caption-\(self)" }
+    var titleId: String { "title-\(self)" }
+    var buttonId: String { "btn-\(self)" }
+    var toggleLeadId: String { "togL-\(self)" }
+    var toggleActionId: String { "togA-\(self)" }
 }
