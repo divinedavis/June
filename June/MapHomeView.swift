@@ -44,28 +44,7 @@ struct MapHomeView: View {
             .padding(.leading, 12)
             .padding(.top, 8)
         }
-        .overlay(alignment: .top) {
-            if let item = selectedItem, routes.active == nil {
-                PlaceCardView(item: item) {
-                    selectedItem = nil
-                } onDirections: {
-                    Task {
-                        if let here = location.currentLocation {
-                            await routes.start(to: item, from: here.coordinate, transport: .automobile)
-                        } else {
-                            item.openInMaps(launchOptions: [
-                                MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
-                            ])
-                        }
-                    }
-                }
-                .environmentObject(routes)
-                .padding(.horizontal, 16)
-                .padding(.top, 60)
-                .transition(.scale(scale: 0.95).combined(with: .opacity))
-            }
-        }
-        .animation(.spring(response: 0.42, dampingFraction: 0.86), value: selectedItem?.placemark.coordinate.latitude)
+        .mapItemDetailSheet(item: $selectedItem)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Color.clear.frame(height: 0)
         }

@@ -6,7 +6,7 @@ Context file for Claude (and future humans) working on this repo. Read this befo
 
 iOS SwiftUI app that replicates the Apple Maps look-and-feel as the home screen of a personal places companion called **June**. The home view is a full-screen MapKit map (dark mode, transit overlay, 3D / locate / Look Around buttons) with a draggable bottom sheet that holds the search field, configurable Places shortcuts, and Recents.
 
-- **Platform:** iOS 17+, SwiftUI, Swift 5.9
+- **Platform:** iOS 26+, SwiftUI, Swift 5.9 (bumped from 17.0 on 2026-04-29 — June has zero shipped users so we target the latest iOS for the freshest APIs, including `mapItemDetailSheet` from 18+)
 - **Backend:** CloudKit (private database) — favorites, recents, profile picture sync via the user's iCloud account
 - **Auth:** Sign in with Apple
 - **Weather pill:** WeatherKit (Apple)

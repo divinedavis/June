@@ -6,7 +6,7 @@ iOS app whose home screen replicates the Apple Maps look-and-feel as a starting 
 
 ## Stack
 
-- iOS 17+, SwiftUI, Swift 5.9
+- iOS 26+, SwiftUI, Swift 5.9
 - MapKit (dark-mode standard map, transit overlay, Look Around)
 - CloudKit (private database) for favorites, recents, and the user profile picture
 - WeatherKit for the weather + AQI pill
