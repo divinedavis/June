@@ -55,9 +55,10 @@ June/
 After any edit:
 1. Build: `xcodebuild -project June.xcodeproj -scheme June -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO`
 2. Only commit if the build succeeds.
-3. `git add` specific files (never `git add -A` blindly — could catch `scripts/asc-config.env`).
-4. Verify `git status` shows no `asc-config.env` or `*.p8` before committing.
-5. `git push origin main`.
+3. **Sensitive-file review (mandatory)** — see rule 5 below. Scan every file about to be pushed for credentials, keys, PII, or build junk.
+4. `git add` specific files (never `git add -A` blindly — could catch `scripts/asc-config.env`).
+5. Verify `git status` shows no `asc-config.env`, `*.p8`, or other secrets before committing.
+6. `git push origin main`.
 
 Remote is SSH: `git@github.com:divinedavis/June.git`.
 
@@ -85,6 +86,19 @@ Gitignored:
 - `*.p8` — App Store Connect API private keys (these live at `~/.appstoreconnect/private_keys/`, never inside the repo)
 
 The ASC API key is shared across all of the user's iOS apps under team `CG89RY4W6R` — same `AuthKey_DCW4DGNGQ4.p8` works for Clock-In, Baseball Tracker, Hidden Gems, and June.
+
+### 5. Sensitive-file review before every push
+
+Before every `git push`, review every file about to leave the machine. Scan for:
+
+- **Credential strings:** `API_KEY=`, `SECRET=`, `PASSWORD=`, `TOKEN=`, `Bearer `, `aws_secret_access_key`, `-----BEGIN .* PRIVATE KEY-----`, token prefixes like `xox[bp]-`, `sk_live_`, `ghp_`, `github_pat_`, Supabase service-role JWTs.
+- **Sensitive filenames:** anything ending in `.env` (other than `.env.example`), `*.p8`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `credentials.json`, `service-account.json`, `Secrets.swift`, `asc-config.env`, `.npmrc` with auth tokens.
+- **Hardcoded secrets in source:** real production URLs to internal hosts, real user PII, hardcoded JWT secrets, hardcoded DB passwords, real test-account passwords.
+- **Unintended bulk:** `node_modules/`, `DerivedData/`, `*.xcarchive`, build outputs, large binaries, `.DS_Store`, editor state with tokens.
+
+If anything sensitive is found: **don't push**. Remove it, gitignore the path, unstage it, or rewrite history if it landed in a commit but hasn't been pushed yet. If a secret has already been pushed to the remote, tell the user immediately so it can be rotated.
+
+Prefer adding patterns to `.gitignore` over remembering — once a class of sensitive file is gitignored, future commits can't slip it in.
 
 ## One-time setup before first ship
 
