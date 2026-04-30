@@ -86,7 +86,15 @@ struct MapHomeView: View {
                 cameraPosition = .rect(newValue.route.polyline.boundingMapRect)
             }
         }
-        .sheet(isPresented: $sheetPresented) {
+        // Two sheets stacked from the same view don't both present in SwiftUI —
+        // when isPresented is bound permanently true and another sheet modifier
+        // is also applied, only one ever shows. Yield the sheet slot to
+        // mapItemDetailSheet whenever an MKMapItem is selected so Apple's place
+        // card can take over; restore the home sheet when it's dismissed.
+        .sheet(isPresented: Binding(
+            get: { sheetPresented && selectedItem == nil },
+            set: { sheetPresented = $0 }
+        )) {
             Group {
                 if routes.active != nil {
                     RouteSheet { endRoute() }
