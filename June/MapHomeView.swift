@@ -15,6 +15,9 @@ struct MapHomeView: View {
     @State private var sheetPresented = true
     @State private var isPitched = false
     @State private var showsTransit = true
+    @State private var didFireInitialWeather = false
+
+    private static let peekDetent: PresentationDetent = .fraction(0.42)
 
     var body: some View {
         Map(position: $cameraPosition) {
@@ -32,26 +35,38 @@ struct MapHomeView: View {
             .padding(.leading, 12)
             .padding(.top, 8)
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            // Reserve space for the peek detent so map controls float above the sheet.
+            Color.clear.frame(height: 0)
+        }
         .overlay(alignment: .bottomLeading) {
             LookAroundControl {
                 // Look Around — wired in a follow-up
             }
             .padding(.leading, 16)
-            .padding(.bottom, 360)
+            .padding(.bottom, 16)
         }
-        .overlay(alignment: .trailing) {
+        .overlay(alignment: .bottomTrailing) {
             MapControls(
                 isPitched: $isPitched,
                 showsTransit: $showsTransit,
                 onLocate: { recenterOnUser() }
             )
             .padding(.trailing, 12)
-            .padding(.bottom, 360)
+            .padding(.bottom, 16)
         }
         .task {
             location.requestAuthorization()
             location.startUpdates()
             await cloud.loadAll()
+            // Weather may not be wired up to a location yet on first launch.
+            // Try whatever we have, and a Brooklyn fallback if nothing yet.
+            if !didFireInitialWeather {
+                didFireInitialWeather = true
+                let seed = location.currentLocation
+                    ?? CLLocation(latitude: 40.6883, longitude: -73.9716)
+                await weather.refresh(for: seed)
+            }
         }
         .onChange(of: location.currentLocation) { _, newValue in
             guard let newValue else { return }
@@ -59,7 +74,7 @@ struct MapHomeView: View {
         }
         .sheet(isPresented: $sheetPresented) {
             HomeSheet()
-                .presentationDetents([.fraction(0.18), .medium, .large])
+                .presentationDetents([Self.peekDetent, .medium, .large])
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                 .presentationCornerRadius(28)
                 .presentationDragIndicator(.visible)

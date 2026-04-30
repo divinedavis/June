@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import os
 import WeatherKit
 
 @MainActor
@@ -11,8 +12,10 @@ final class WeatherService: ObservableObject {
     }
 
     @Published var snapshot: Snapshot?
+    @Published var lastError: String?
 
     private let service = WeatherKit.WeatherService.shared
+    private let log = Logger(subsystem: "com.divinedavis.june", category: "WeatherService")
 
     func refresh(for location: CLLocation) async {
         do {
@@ -24,8 +27,15 @@ final class WeatherService: ObservableObject {
                 aqi: nil,
                 conditionSymbol: symbol
             )
+            lastError = nil
+            log.info("WeatherKit OK: \(tempF)°F (\(symbol))")
         } catch {
-            // Leave snapshot nil on failure; UI shows nothing rather than stale data.
+            // WeatherKit can take up to ~24h to fully provision after first enabling
+            // the capability, and the framework throws opaque errors when it can't
+            // authenticate. Surface to Console + lastError; keep the previous
+            // snapshot rather than nil so the UI doesn't flicker between values.
+            log.error("WeatherKit failed: \(error.localizedDescription, privacy: .public)")
+            lastError = error.localizedDescription
         }
     }
 }

@@ -10,18 +10,20 @@ struct WeatherPill: View {
             Image(systemName: conditionSymbol ?? "cloud.fill")
                 .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(.white)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(temperatureFahrenheit.map { "\($0)°" } ?? "—")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                if let aqi {
-                    HStack(spacing: 4) {
-                        Text("AQI \(aqi)")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.85))
-                        Circle()
-                            .fill(aqiColor(aqi))
-                            .frame(width: 6, height: 6)
+            if let temperatureFahrenheit {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(temperatureFahrenheit)°")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                    if let aqi {
+                        HStack(spacing: 4) {
+                            Text("AQI \(aqi)")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.85))
+                            Circle()
+                                .fill(aqiColor(aqi))
+                                .frame(width: 6, height: 6)
+                        }
                     }
                 }
             }
