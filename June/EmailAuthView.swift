@@ -11,35 +11,46 @@ struct EmailAuthView: View {
     @State private var mode: EmailAuthMode = .signIn
     @State private var showingComingSoon = false
 
-    // Shared between sign-in and sign-up so values persist across the toggle.
+    @State private var fullName = ""
     @State private var email = ""
     @State private var password = ""
-    // Sign-up only.
-    @State private var username = ""
-    @State private var confirm = ""
 
     var body: some View {
-        VStack(spacing: 0) {
-            cancelBar
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 16)
+        ZStack {
+            backdrop
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    header
-                    subtitle
-                        .padding(.bottom, 32)
-                    fields
-                    submitButton
-                    toggleLink
-                        .padding(.top, 16)
+            VStack(spacing: 0) {
+                cancelBar
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+
+                ScrollView {
+                    VStack(spacing: 0) {
+                        Spacer().frame(height: 24)
+                        brandIcon
+                        Spacer().frame(height: 24)
+                        headline
+                            .padding(.horizontal, 32)
+                        Spacer().frame(height: 36)
+                        fields
+                            .padding(.horizontal, 24)
+                        Spacer().frame(height: 18)
+                        if mode == .signUp {
+                            disclaimer
+                                .padding(.horizontal, 36)
+                                .transition(.opacity)
+                        }
+                        Spacer().frame(height: 24)
+                        submitButton
+                            .padding(.horizontal, 24)
+                        Spacer().frame(height: 16)
+                        toggleLink
+                            .padding(.bottom, 32)
+                    }
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 40)
             }
         }
-        .background(JuneTheme.sheetBackground.ignoresSafeArea())
+        .preferredColorScheme(.light)
         .alert("Coming soon", isPresented: $showingComingSoon) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -47,69 +58,91 @@ struct EmailAuthView: View {
         }
     }
 
-    // MARK: - Bars
+    // MARK: - Backdrop
+
+    private var backdrop: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.40, green: 0.56, blue: 1.0),
+                    Color(red: 0.78, green: 0.86, blue: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            ConcentricRings()
+                .ignoresSafeArea()
+        }
+    }
 
     private var cancelBar: some View {
         HStack {
-            Button("Cancel") { dismiss() }
-                .font(.system(size: 17))
-                .foregroundStyle(.secondary)
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(.white.opacity(0.18)))
+            }
             Spacer()
         }
     }
 
-    // MARK: - Header (caption + title) — crossfades on mode change
+    // MARK: - Brand icon + headline
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Group {
-                if mode == .signIn {
-                    Text("Welcome back.")
-                } else {
-                    Text("Let's get started.")
+    private var brandIcon: some View {
+        Image(systemName: "location.viewfinder")
+            .font(.system(size: 26, weight: .semibold))
+            .foregroundStyle(Color(red: 0.36, green: 0.50, blue: 0.96))
+            .frame(width: 56, height: 56)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.96))
+            )
+            .shadow(color: .black.opacity(0.10), radius: 10, y: 4)
+    }
+
+    private var headline: some View {
+        Group {
+            if mode == .signIn {
+                VStack(spacing: 4) {
+                    Text("Welcome back to")
+                        .font(.system(size: 28, weight: .bold))
+                    Text("your June")
+                        .font(.system(size: 28, weight: .regular, design: .serif))
+                        .italic()
+                }
+            } else {
+                VStack(spacing: 4) {
+                    Text("Where all your")
+                        .font(.system(size: 28, weight: .bold))
+                    Text("Places begin")
+                        .font(.system(size: 28, weight: .regular, design: .serif))
+                        .italic()
                 }
             }
-            .font(.system(size: 17))
-            .foregroundStyle(.secondary)
-            .id(mode.captionId)
-            .transition(.opacity)
-
-            Group {
-                if mode == .signIn {
-                    Text("Sign in to June.")
-                } else {
-                    Text("Join June.")
-                }
-            }
-            .font(.system(size: 38, weight: .heavy))
-            .foregroundStyle(.white)
-            .fixedSize(horizontal: false, vertical: true)
-            .id(mode.titleId)
-            .transition(.opacity)
         }
-        .padding(.top, 8)
-        .padding(.bottom, 20)
+        .foregroundStyle(.white)
+        .multilineTextAlignment(.center)
+        .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+        .id(mode)
+        .transition(.opacity)
     }
 
-    private var subtitle: some View {
-        Text("All your favorite places, in one place.")
-            .font(.system(size: 17))
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    // MARK: - Fields — Email + Password are persistent; Username slides in
-    // from above, Confirm password slides in from below.
+    // MARK: - Fields
 
     private var fields: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(spacing: 14) {
             if mode == .signUp {
-                field(
-                    label: "Username",
-                    text: $username,
+                GlassField(
+                    placeholder: "Full name",
+                    text: $fullName,
                     isSecure: false,
-                    contentType: .username,
-                    autocapitalize: .never,
+                    contentType: .name,
+                    keyboard: .default,
+                    autocapitalize: .words,
                     autocorrect: false
                 )
                 .transition(.asymmetric(
@@ -117,9 +150,8 @@ struct EmailAuthView: View {
                     removal: .move(edge: .top).combined(with: .opacity)
                 ))
             }
-
-            field(
-                label: "Email",
+            GlassField(
+                placeholder: "Email",
                 text: $email,
                 isSecure: false,
                 contentType: .emailAddress,
@@ -127,31 +159,31 @@ struct EmailAuthView: View {
                 autocapitalize: .never,
                 autocorrect: false
             )
-
-            field(
-                label: "Password",
+            GlassField(
+                placeholder: "Password",
                 text: $password,
                 isSecure: true,
-                contentType: mode == .signIn ? .password : .newPassword
+                contentType: mode == .signIn ? .password : .newPassword,
+                keyboard: .default,
+                autocapitalize: .never,
+                autocorrect: false
             )
-
-            if mode == .signUp {
-                field(
-                    label: "Confirm password",
-                    text: $confirm,
-                    isSecure: true,
-                    contentType: .newPassword
-                )
-                .transition(.asymmetric(
-                    insertion: .move(edge: .bottom).combined(with: .opacity),
-                    removal: .move(edge: .bottom).combined(with: .opacity)
-                ))
-            }
         }
-        .padding(.bottom, 32)
     }
 
-    // MARK: - Submit + toggle
+    // MARK: - Disclaimer + button + toggle
+
+    private var disclaimer: some View {
+        let footer = (Text("By creating an account, you agree to our ")
+            + Text("Terms of Service").underline()
+            + Text(" and ")
+            + Text("Privacy Policy").underline()
+            + Text(". We won't sell your personal information."))
+        return footer
+            .font(.system(size: 13))
+            .foregroundStyle(.white.opacity(0.92))
+            .multilineTextAlignment(.center)
+    }
 
     private var submitButton: some View {
         Button {
@@ -159,20 +191,21 @@ struct EmailAuthView: View {
         } label: {
             Group {
                 if mode == .signIn {
-                    Text("Sign In")
+                    Text("Sign in")
                 } else {
-                    Text("Create Account")
+                    Text("Create account")
                 }
             }
-            .id(mode.buttonId)
+            .id(mode)
             .transition(.opacity)
             .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(isValid ? Color(red: 0.36, green: 0.50, blue: 0.96) : Color(white: 0.55))
             .frame(maxWidth: .infinity)
-            .frame(height: 52)
+            .frame(height: 56)
             .background(
-                Capsule().fill(isValid ? JuneTheme.accent : Color.white.opacity(0.18))
+                Capsule().fill(Color.white.opacity(isValid ? 1.0 : 0.65))
             )
+            .shadow(color: .black.opacity(0.10), radius: 10, y: 4)
         }
         .disabled(!isValid)
     }
@@ -187,10 +220,10 @@ struct EmailAuthView: View {
                     Text("Already have an account? ")
                 }
             }
-            .id(mode.toggleLeadId)
+            .id("lead-\(mode)")
             .transition(.opacity)
-            .font(.system(size: 15))
-            .foregroundStyle(.secondary)
+            .font(.system(size: 14))
+            .foregroundStyle(.white.opacity(0.85))
 
             Button {
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.84)) {
@@ -204,9 +237,9 @@ struct EmailAuthView: View {
                         Text("Sign in")
                     }
                 }
-                .id(mode.toggleActionId)
+                .id("action-\(mode)")
                 .transition(.opacity)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .underline()
                 .foregroundStyle(.white)
             }
@@ -221,53 +254,81 @@ struct EmailAuthView: View {
         case .signIn:
             return email.contains("@") && !password.isEmpty
         case .signUp:
-            return !username.trimmingCharacters(in: .whitespaces).isEmpty
+            return !fullName.trimmingCharacters(in: .whitespaces).isEmpty
                 && email.contains("@")
                 && password.count >= 6
-                && password == confirm
-        }
-    }
-
-    // MARK: - Field builder
-
-    private func field(
-        label: String,
-        text: Binding<String>,
-        isSecure: Bool,
-        contentType: UITextContentType? = nil,
-        keyboard: UIKeyboardType = .default,
-        autocapitalize: TextInputAutocapitalization = .sentences,
-        autocorrect: Bool = true
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(label)
-                .font(.system(size: 15))
-                .foregroundStyle(.secondary)
-            Group {
-                if isSecure {
-                    SecureField("", text: text)
-                } else {
-                    TextField("", text: text)
-                        .keyboardType(keyboard)
-                        .textInputAutocapitalization(autocapitalize)
-                        .autocorrectionDisabled(!autocorrect)
-                }
-            }
-            .textContentType(contentType)
-            .foregroundStyle(.white)
-            .font(.system(size: 17))
-            .padding(.vertical, 6)
-            Rectangle()
-                .fill(Color.white.opacity(0.2))
-                .frame(height: 1)
         }
     }
 }
 
-private extension EmailAuthMode {
-    var captionId: String { "caption-\(self)" }
-    var titleId: String { "title-\(self)" }
-    var buttonId: String { "btn-\(self)" }
-    var toggleLeadId: String { "togL-\(self)" }
-    var toggleActionId: String { "togA-\(self)" }
+// MARK: - GlassField
+
+private struct GlassField: View {
+    let placeholder: String
+    @Binding var text: String
+    let isSecure: Bool
+    let contentType: UITextContentType?
+    let keyboard: UIKeyboardType
+    let autocapitalize: TextInputAutocapitalization
+    let autocorrect: Bool
+
+    var body: some View {
+        Group {
+            if isSecure {
+                SecureField("", text: $text, prompt: prompt)
+            } else {
+                TextField("", text: $text, prompt: prompt)
+                    .keyboardType(keyboard)
+                    .textInputAutocapitalization(autocapitalize)
+                    .autocorrectionDisabled(!autocorrect)
+            }
+        }
+        .textContentType(contentType)
+        .foregroundStyle(.white)
+        .font(.system(size: 16))
+        .padding(.horizontal, 22)
+        .frame(height: 56)
+        .background(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(Color.white.opacity(0.18))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(Color.white.opacity(0.4), lineWidth: 1)
+        )
+    }
+
+    private var prompt: Text {
+        Text(placeholder).foregroundColor(.white.opacity(0.7))
+    }
+}
+
+// MARK: - Concentric rings background pattern
+
+private struct ConcentricRings: View {
+    var body: some View {
+        GeometryReader { geo in
+            Canvas { ctx, size in
+                let cx = size.width / 2
+                let cy = size.height * 0.42
+                let baseRadius = size.width * 0.24
+                for i in 0..<10 {
+                    let radius = baseRadius + CGFloat(i) * size.width * 0.085
+                    let rect = CGRect(
+                        x: cx - radius,
+                        y: cy - radius,
+                        width: radius * 2,
+                        height: radius * 2
+                    )
+                    let alpha: Double = max(0.08, 0.30 - Double(i) * 0.022)
+                    ctx.stroke(
+                        Path(ellipseIn: rect),
+                        with: .color(.white.opacity(alpha)),
+                        lineWidth: 1
+                    )
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+    }
 }
