@@ -44,7 +44,6 @@ struct MapHomeView: View {
             .padding(.leading, 12)
             .padding(.top, 8)
         }
-        .mapItemDetailSheet(item: $selectedItem)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Color.clear.frame(height: 0)
         }
@@ -86,18 +85,16 @@ struct MapHomeView: View {
                 cameraPosition = .rect(newValue.route.polyline.boundingMapRect)
             }
         }
-        // Two sheets stacked from the same view don't both present in SwiftUI —
-        // when isPresented is bound permanently true and another sheet modifier
-        // is also applied, only one ever shows. Yield the sheet slot to
-        // mapItemDetailSheet whenever an MKMapItem is selected so Apple's place
-        // card can take over; restore the home sheet when it's dismissed.
-        .sheet(isPresented: Binding(
-            get: { sheetPresented && selectedItem == nil },
-            set: { sheetPresented = $0 }
-        )) {
+        .sheet(isPresented: $sheetPresented) {
             Group {
                 if routes.active != nil {
                     RouteSheet { endRoute() }
+                } else if let selectedItem {
+                    PlaceDetailSheet(
+                        item: selectedItem,
+                        onDismiss: { self.selectedItem = nil },
+                        onDirections: { startInAppDirections(to: selectedItem) }
+                    )
                 } else {
                     HomeSheet(selectedItem: $selectedItem)
                 }
@@ -111,9 +108,23 @@ struct MapHomeView: View {
         }
     }
 
+    private func startInAppDirections(to item: MKMapItem) {
+        Task {
+            if let here = location.currentLocation {
+                await routes.start(to: item, from: here.coordinate, transport: .automobile)
+            } else {
+                item.openInMaps(launchOptions: [
+                    MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
+                ])
+            }
+        }
+    }
+
     private var currentDetents: Set<PresentationDetent> {
         if routes.active != nil {
             return [Self.routeDetent, .medium, .large]
+        } else if selectedItem != nil {
+            return [Self.placeDetent, .medium, .large]
         } else {
             return [Self.peekDetent, .medium, .large]
         }
