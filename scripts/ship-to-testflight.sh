@@ -123,6 +123,67 @@ MARKETING=$(awk -F'"' '/MARKETING_VERSION:/ {print $2; exit}' project.yml)
 info "regenerating Xcode project"
 xcodegen generate >/dev/null
 
+# ---------- pre-archive smoke test on simulator ----------
+# A green compile doesn't prove the app launches — many crashes only show up at
+# runtime (CKContainer without entitlement, missing usage descriptions, etc.).
+# Run a fresh sim build, install, launch, and bail if a crash report appears.
+SMOKE_DEVICE="${ASC_SMOKE_DEVICE:-}"
+if [[ -z "$SMOKE_DEVICE" ]]; then
+    SMOKE_DEVICE=$(xcrun simctl list devices booted 2>/dev/null \
+        | awk -F'[()]' '/Booted/ {print $2; exit}')
+fi
+if [[ -z "$SMOKE_DEVICE" ]]; then
+    SMOKE_DEVICE=$(xcrun simctl list devices available iOS 2>/dev/null \
+        | awk -F'[()]' '/iPhone 1[5-9]/ {print $2; exit}')
+fi
+if [[ -n "$SMOKE_DEVICE" ]]; then
+    info "smoke-testing on simulator $SMOKE_DEVICE"
+    xcrun simctl boot "$SMOKE_DEVICE" 2>/dev/null || true
+    SMOKE_DD=/tmp/${SCHEME}-smoke-dd
+    rm -rf "$SMOKE_DD"
+    xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
+        -sdk iphonesimulator -destination "id=$SMOKE_DEVICE" \
+        -derivedDataPath "$SMOKE_DD" clean build \
+        CODE_SIGNING_ALLOWED=NO >/tmp/ship-smoke-build.log 2>&1 \
+        || { tail -30 /tmp/ship-smoke-build.log; die "smoke build failed"; }
+    SMOKE_APP=$(find "$SMOKE_DD/Build/Products/Debug-iphonesimulator" \
+        -maxdepth 2 -name "${SCHEME}.app" -type d | head -1)
+    [[ -d "$SMOKE_APP" ]] || die "smoke .app not found"
+    BUNDLE_ID="${ASC_BUNDLE_ID}"
+    xcrun simctl uninstall "$SMOKE_DEVICE" "$BUNDLE_ID" 2>/dev/null || true
+    xcrun simctl install "$SMOKE_DEVICE" "$SMOKE_APP"
+    SMOKE_T0=$(date +%s)
+    xcrun simctl launch "$SMOKE_DEVICE" "$BUNDLE_ID" >/dev/null
+    sleep 6
+    FRESH_CRASH=$(ls -t ~/Library/Logs/DiagnosticReports/${SCHEME}*.ips 2>/dev/null | head -1)
+    if [[ -n "$FRESH_CRASH" ]]; then
+        CRASH_TS=$(stat -f %m "$FRESH_CRASH")
+        if (( CRASH_TS >= SMOKE_T0 )); then
+            echo "─── crash report ───"
+            python3 - <<PYEOF
+import json
+parts = open("$FRESH_CRASH").read().split("\n", 1)
+body = json.loads(parts[1])
+print("exception:", body["exception"])
+print("termination:", body["termination"])
+for t in body.get("threads", []):
+    if t.get("triggered"):
+        for i, f in enumerate(t.get("frames", [])[:15]):
+            sym = f.get("symbol") or f.get("symbolLocation", "")
+            idx = f.get("imageIndex")
+            img = body["usedImages"][idx]["name"] if idx is not None and idx < len(body.get("usedImages", [])) else "?"
+            print(f"  {i:2d} {img:30s} {sym}")
+        break
+PYEOF
+            echo "─── full report: $FRESH_CRASH ───"
+            die "smoke launch crashed — fix before shipping"
+        fi
+    fi
+    info "smoke launch OK"
+else
+    info "no iOS simulator available — skipping smoke test"
+fi
+
 # ---------- archive ----------
 ARCHIVE=/tmp/${SCHEME}-ship.xcarchive
 EXPORT_DIR=/tmp/${SCHEME}-ship-export
