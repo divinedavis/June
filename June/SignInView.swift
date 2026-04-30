@@ -4,6 +4,7 @@ import SwiftUI
 struct SignInView: View {
     @EnvironmentObject private var auth: AuthManager
     @State private var comingSoonProvider: String?
+    @State private var showingEmailAuth = false
 
     var body: some View {
         ZStack {
@@ -24,7 +25,7 @@ struct SignInView: View {
                         label: "Continue with email",
                         systemImage: "envelope"
                     ) {
-                        comingSoonProvider = "email"
+                        showingEmailAuth = true
                     }
 
                     appleButton
@@ -41,6 +42,10 @@ struct SignInView: View {
             }
         }
         .ignoresSafeArea(.keyboard)
+        .sheet(isPresented: $showingEmailAuth) {
+            EmailAuthView()
+                .presentationDragIndicator(.visible)
+        }
         .alert(item: $comingSoonProvider.asAlertItem) { item in
             Alert(
                 title: Text("Coming soon"),
