@@ -44,6 +44,7 @@ struct MapHomeView: View {
             .padding(.leading, 12)
             .padding(.top, 8)
         }
+        .mapItemDetailSheet(item: $selectedItem)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Color.clear.frame(height: 0)
         }
@@ -85,16 +86,17 @@ struct MapHomeView: View {
                 cameraPosition = .rect(newValue.route.polyline.boundingMapRect)
             }
         }
-        .sheet(isPresented: $sheetPresented) {
+        // Yield the home-sheet slot when a POI is tapped so mapItemDetailSheet
+        // (Apple's draggable place card) can take over. When the user dismisses
+        // the place card, selectedItem flips back to nil and the home sheet
+        // returns.
+        .sheet(isPresented: Binding(
+            get: { sheetPresented && selectedItem == nil },
+            set: { sheetPresented = $0 }
+        )) {
             Group {
                 if routes.active != nil {
                     RouteSheet { endRoute() }
-                } else if let selectedItem {
-                    PlaceDetailSheet(
-                        item: selectedItem,
-                        onDismiss: { self.selectedItem = nil },
-                        onDirections: { startInAppDirections(to: selectedItem) }
-                    )
                 } else {
                     HomeSheet(selectedItem: $selectedItem)
                 }
@@ -108,23 +110,9 @@ struct MapHomeView: View {
         }
     }
 
-    private func startInAppDirections(to item: MKMapItem) {
-        Task {
-            if let here = location.currentLocation {
-                await routes.start(to: item, from: here.coordinate, transport: .automobile)
-            } else {
-                item.openInMaps(launchOptions: [
-                    MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
-                ])
-            }
-        }
-    }
-
     private var currentDetents: Set<PresentationDetent> {
         if routes.active != nil {
             return [Self.routeDetent, .medium, .large]
-        } else if selectedItem != nil {
-            return [Self.placeDetent, .medium, .large]
         } else {
             return [Self.peekDetent, .medium, .large]
         }
